@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>SWING & DEER QR 생성기</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @media print {
+      body * { visibility: hidden !important; }
+      #preview, #preview * {
+        visibility: visible !important;
+      }
+      #preview {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 2.3cm;
+        height: 2.3cm;
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        border: 1px solid black;
+      }
+    }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center px-4 py-6">
+  <h1 class="text-xl font-bold mb-4 text-center">SWING & DEER QR 생성기</h1>
+
+  <div id="preview" class="w-[5cm] h-[5cm] border border-gray-400 bg-white flex flex-col justify-start items-center relative mb-6">
+    <div class="w-full h-full border border-black flex justify-center items-center">
+      <canvas id="qrcode" class="w-[1.8cm] h-[1.8cm] mt-[0%]"></canvas>
+    </div>
+    <div id="qrText" class="absolute top-[70%] text-center font-bold text-[0.2cm] w-full">QR 이름</div>
+  </div>
+
+  <div class="w-full max-w-sm flex flex-col gap-4 mb-8">
+    <input type="text" id="qrLabel" placeholder="QR 아래 표시할 이름" class="w-full px-4 py-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400">
+    <button onclick="generateQR()" class="bg-blue-500 text-white py-2 rounded hover:bg-blue-600">QR 생성</button>
+    <button onclick="downloadPNG()" class="bg-green-500 text-white py-2 rounded hover:bg-green-600">PNG 저장</button>
+    <button onclick="window.print()" class="bg-gray-700 text-white py-2 rounded hover:bg-gray-800">프린트</button>
+  </div>
+
+  <div class="w-full max-w-sm flex flex-col gap-4">
+    <h2 class="text-lg font-semibold mb-2 text-center">설정 메뉴</h2>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm">QR 위치 (Top %)
+        <input type="range" id="qrMarginTop" min="0" max="50" value="0" class="w-full" onchange="updateLayout()">
+      </label>
+      <label class="text-sm">QR 크기 (cm)
+        <input type="range" id="qrSize" min="1" max="5" step="0.1" value="1.8" class="w-full" onchange="updateLayout()">
+      </label>
+      <label class="text-sm">QR 이름 위치 (Top %)
+        <input type="range" id="textMarginTop" min="0" max="50" value="2" class="w-full" onchange="updateLayout()">
+      </label>
+      <label class="text-sm">QR 이름 크기 (cm)
+        <input type="range" id="textSize" min="0.1" max="0.5" step="0.01" value="0.2" class="w-full" onchange="updateLayout()">
+      </label>
+    </div>
+    <button onclick="saveSettings()" class="bg-indigo-500 text-white py-2 rounded hover:bg-indigo-600">설정 저장</button>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script>
+    function generateQR() {
+      const label = document.getElementById('qrLabel')?.value.trim().toUpperCase() || '';
+      let url = "";
+      if (/^\d{5}$/.test(label) || label.startsWith("DEER")) {
+        url = `https://deering.co/qr?name=${label}`;
+      } else if (label.startsWith("CY") || label.startsWith("CS")) {
+        url = `https://qr.jp.swingmobility.dev/scooter?qr=${label}`;
+      } else if (/^[A-Z]{2}\d{4}$/.test(label) || /^[A-Z]{7}$/.test(label)) {
+        url = `https://tswm.link/${label}`;
+      } else {
+        url = `http://qrcode.theswing.co.kr/swingapp.page.link/${label}`;
+      }
+
+      const sizeCm = document.getElementById('qrSize').value;
+      const sizePx = parseFloat(sizeCm) * 37.8 * 5;
+      QRCode.toCanvas(document.getElementById('qrcode'), url, { width: sizePx }, function (error) {
+        if (error) console.error(error);
+      });
+      document.getElementById('qrText').innerText = label;
+      updateLayout();
+    }
+
+    function updateLayout() {
+      const qrMarginTop = document.getElementById('qrMarginTop').value;
+      const qrSize = document.getElementById('qrSize').value;
+      const textMarginTop = document.getElementById('textMarginTop').value;
+      const textSize = document.getElementById('textSize').value;
+
+      const qrCanvas = document.getElementById('qrcode');
+      qrCanvas.style.marginTop = qrMarginTop + '%';
+      qrCanvas.style.width = qrSize + 'cm';
+      qrCanvas.style.height = qrSize + 'cm';
+
+      const qrText = document.getElementById('qrText');
+      qrText.style.top = (50 + parseFloat(textMarginTop)) + '%';
+      qrText.style.fontSize = textSize + 'cm';
+    }
+
+    function saveSettings() {
+      const settings = {
+        qrMarginTop: document.getElementById('qrMarginTop').value,
+        qrSize: document.getElementById('qrSize').value,
+        textMarginTop: document.getElementById('textMarginTop').value,
+        textSize: document.getElementById('textSize').value,
+        qrLabel: document.getElementById('qrLabel').value.trim()
+      };
+      localStorage.setItem('qrSettings', JSON.stringify(settings));
+      alert('설정이 저장되었습니다!');
+    }
+
+    function loadSettings() {
+      const saved = localStorage.getItem('qrSettings');
+      if (saved) {
+        const settings = JSON.parse(saved);
+        document.getElementById('qrMarginTop').value = settings.qrMarginTop;
+        document.getElementById('qrSize').value = settings.qrSize;
+        document.getElementById('textMarginTop').value = settings.textMarginTop;
+        document.getElementById('textSize').value = settings.textSize;
+        document.getElementById('qrLabel').value = settings.qrLabel || "";
+        updateLayout();
+      }
+    }
+
+    function downloadPNG() {
+      html2canvas(document.getElementById('preview'), {
+        scale: 5,
+        backgroundColor: null
+      }).then(canvas => {
+        const finalSize = 87 * 5;
+        const trimmedCanvas = document.createElement('canvas');
+        trimmedCanvas.width = finalSize;
+        trimmedCanvas.height = finalSize;
+        const ctx = trimmedCanvas.getContext('2d');
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, finalSize, finalSize);
+        ctx.drawImage(canvas, 0, 0, finalSize, finalSize);
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 5;
+        ctx.strokeRect(0, 0, finalSize, finalSize);
+
+        const link = document.createElement('a');
+        link.download = (document.getElementById('qrLabel').value.trim() || 'qr-tag') + ".png";
+        link.href = trimmedCanvas.toDataURL();
+        link.click();
+      });
+    }
+
+    window.onload = function () {
+      loadSettings();
+      generateQR();
+    };
+  </script>
+</body>
+</html>
